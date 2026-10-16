@@ -44,6 +44,8 @@ function App() {
   const [previewLimit, setPreviewLimit] = useState(30);
   const [jobId, setJobId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [loadingCountry, setLoadingCountry] = useState(false);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   const visibleTracks = useMemo(
     () => (view === 'playlist' ? savedTracks : tracks).filter((item) =>
@@ -68,7 +70,13 @@ function App() {
     }
 
     setBusy(true);
+    setLoadingCountry(true);
+    setLoadingSeconds(0);
     setStatus(`Loading chart for ${normalized.toUpperCase()}...`);
+    const startedAt = Date.now();
+    const loadingTimer = window.setInterval(() => {
+      setLoadingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
 
     try {
       const data = await request<{ country: string; tracks: Track[] }>(
@@ -99,6 +107,8 @@ function App() {
           : 'Could not load the playlist.',
       );
     } finally {
+      window.clearInterval(loadingTimer);
+      setLoadingCountry(false);
       setBusy(false);
     }
   }
@@ -122,10 +132,11 @@ function App() {
     }
   }
 
- async function play(track: Track) {
+  async function play(track: Track) {
   let previewUrl = track.preview_url;
+  const sameTrack = selected !== null && trackKey(selected) === trackKey(track);
 
-  if (selected === track && !audio.current.paused) {
+  if (sameTrack && !audio.current.paused) {
     audio.current.pause();
     setIsPlaying(false);
     return;
@@ -165,7 +176,12 @@ function App() {
 
     const fullPreviewUrl = `${API}${previewUrl}`;
 
-    if (selected === track && audio.current.paused) {
+    if (sameTrack && audio.current.ended) {
+      audio.current.currentTime = 0;
+      setPreviewSeconds(0);
+    }
+
+    if (sameTrack && audio.current.paused && !audio.current.ended) {
       await audio.current.play();
       setIsPlaying(true);
       return;
@@ -177,7 +193,9 @@ function App() {
       audio.current.src !==
       new URL(fullPreviewUrl, window.location.href).href
     ) {
+      audio.current.pause();
       audio.current.src = fullPreviewUrl;
+      audio.current.load();
     }
 
     audio.current.currentTime = 0;
@@ -424,7 +442,11 @@ function App() {
 
     const pause = () => setIsPlaying(false);
     const playEvent = () => setIsPlaying(true);
-    const ended = () => setIsPlaying(false);
+    const ended = () => {
+      player.currentTime = 0;
+      setPreviewSeconds(0);
+      setIsPlaying(false);
+    };
 
     player.addEventListener(
       'timeupdate',
@@ -685,7 +707,24 @@ function App() {
           )}
         </div>
 
-        {busy && (
+        {loadingCountry && (
+          <div className="download-progress loading-country">
+            <div className="progress-label">
+              <span>
+                Loading {countryInput.toUpperCase()} · first load may take a few minutes
+              </span>
+              <b>{loadingSeconds}s</b>
+            </div>
+            <p className="loading-hint">
+              Reading daily, weekly and totals charts, then checking the tracks.
+            </p>
+            <div className="progress-indicator">
+              <i />
+            </div>
+          </div>
+        )}
+
+        {busy && !loadingCountry && (
           <div className="download-progress">
             <div className="progress-label">
               <span>
