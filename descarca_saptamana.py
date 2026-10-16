@@ -35,8 +35,6 @@ FOLDER_LIBRARY = "Music_Library"
 
 MAX_WORKERS = 4
 
-NUMAR_MELODII_PE_ZI = 200
-
 ZILE = [
     "MONDAY",
     "TUESDAY",
@@ -471,17 +469,12 @@ def genereaza_saptamana(
         chei_vazute.add(cheie)
         melodii_unice.append(melodie)
 
+    melodii_zi = melodii_unice[:200]
+    rezultat = {}
+
     for i, zi in enumerate(ZILE):
-
-        rng = random.Random(
-            1000 + i
-        )
-
-        lista = melodii_unice.copy()
-
-        rng.shuffle(lista)
-        lista = lista[:NUMAR_MELODII_PE_ZI]
-
+        lista = melodii_zi.copy()
+        random.Random(1000 + i).shuffle(lista)
         rezultat[zi] = lista
 
     return rezultat
@@ -521,8 +514,8 @@ def creeaza_zip(
     ) as archive:
 
         for zi in ZILE:
-
-            lista = saptamana[zi]
+            lista = list(saptamana.get(zi, []))
+            random.shuffle(lista)
 
             print(
                 f"{zi}: "

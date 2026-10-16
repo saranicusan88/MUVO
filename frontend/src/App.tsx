@@ -55,7 +55,8 @@ function App() {
   );
 
   const activeTracks = view === 'playlist' ? savedTracks : tracks;
-  const canDownload = view === 'playlist' && activeTracks.length > 0;
+  const canDownload =
+    (view === 'top' || view === 'playlist') && activeTracks.length > 0;
 
   function trackKey(track: Track) {
     return `${track.artist.trim().toLocaleLowerCase('ro')}|${track.track.trim().toLocaleLowerCase('ro')}`;
@@ -109,6 +110,29 @@ function App() {
     } finally {
       window.clearInterval(loadingTimer);
       setLoadingCountry(false);
+      setBusy(false);
+    }
+  }
+
+  async function loadTopClean() {
+    setBusy(true);
+    setStatus('Loading top_200_clean.csv...');
+
+    try {
+      const data = await request<{ tracks: Track[] }>('/api/current');
+      setCountry('global');
+      setCountryInput('global');
+      setTracks(data.tracks);
+      setSelected(null);
+      setView('top');
+      setStatus(`${data.tracks.length} tracks loaded from Top 200 Clean.`);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Could not load top_200_clean.csv.',
+      );
+    } finally {
       setBusy(false);
     }
   }
@@ -298,9 +322,13 @@ function App() {
   }
 
   async function download() {
+    if (busy) {
+      return;
+    }
+
     if (!canDownload) {
       setStatus(
-        'Add at least one track to My Playlist before downloading the archive.',
+        'There are no tracks available to download.',
       );
       return;
     }
@@ -326,6 +354,7 @@ function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            organize_by_day: view === 'top',
             tracks: activeTracks.map(
               ({ artist, track }) => ({
                 artist,
@@ -419,6 +448,10 @@ function App() {
     }
   }
 
+  function downloadTopClean() {
+    window.location.href = `${API}/api/download-top-clean`;
+  }
+
   useEffect(() => {
     const player = audio.current;
 
@@ -494,7 +527,7 @@ function App() {
   }, [previewLimit]);
 
   useEffect(() => {
-    void loadCountry('global');
+    void loadTopClean();
   }, []);
 
   function openView(
@@ -591,6 +624,14 @@ function App() {
           >
             Download ZIP
           </button>
+
+          <button
+            className="download top-download"
+            onClick={downloadTopClean}
+            disabled={busy || !tracks.length}
+          >
+            Download CSV
+          </button>
         </header>
 
         <section className="hero">
@@ -616,7 +657,9 @@ function App() {
                   busy || !canDownload
                 }
               >
-                Download playlist
+                {view === 'playlist'
+                  ? 'Download playlist'
+                  : 'Download Top 200 Clean'}
               </button>
 
               <span className="muted">
@@ -855,17 +898,28 @@ function App() {
                       ×
                     </button>
                   ) : (
-                    <button
-                      className="add-track"
-                      onClick={() =>
-                        addToPlaylist([
-                          track,
-                        ])
-                      }
-                      aria-label={`Add ${track.track}`}
-                    >
-                      ＋
-                    </button>
+                    <>
+                      <button
+                        className="add-track"
+                        onClick={() =>
+                          addToPlaylist([
+                            track,
+                          ])
+                        }
+                        aria-label={`Add ${track.track}`}
+                      >
+                        ＋
+                      </button>
+                      <button
+                        className="remove"
+                        onClick={() =>
+                          remove(track)
+                        }
+                        aria-label={`Remove ${track.track} from Top 200 Clean`}
+                      >
+                        ×
+                      </button>
+                    </>
                   )}
                 </article>
               ),

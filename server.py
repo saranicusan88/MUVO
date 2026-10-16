@@ -113,7 +113,12 @@ def set_job(job_id, **values):
         JOBS.setdefault(job_id, {}).update(values)
 
 
-def run_week_download(job_id, country, selected_tracks=None):
+def run_week_download(
+    job_id,
+    country,
+    selected_tracks=None,
+    organize_by_day=False,
+):
     try:
         import descarca_saptamana
 
@@ -146,10 +151,19 @@ def run_week_download(job_id, country, selected_tracks=None):
         if JOB_CANCEL_EVENTS[job_id].is_set():
             set_job(job_id, status="cancelled", phase="cancelled")
             return
-        descarca_saptamana.creeaza_zip_simplu(
-            downloaded,
-            progress_callback=update_progress,
-        )
+        if organize_by_day:
+            week_tracks = descarca_saptamana.genereaza_saptamana(
+                downloaded
+            )
+            descarca_saptamana.creeaza_zip(
+                week_tracks,
+                progress_callback=update_progress,
+            )
+        else:
+            descarca_saptamana.creeaza_zip_simplu(
+                downloaded,
+                progress_callback=update_progress,
+            )
         archive = Path(descarca_saptamana.NUME_ZIP)
         set_job(
             job_id,
@@ -222,6 +236,20 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/current":
                 self.send_json({"tracks": serialize_tracks(read_tracks())})
                 return
+            if path == "/api/download-top-clean":
+                csv_file = OUTPUT / "top_200_clean.csv"
+                if not csv_file.is_file():
+                    self.send_json(
+                        {"error": "Fișierul top_200_clean.csv nu există încă."},
+                        404,
+                    )
+                    return
+                self.send_file(
+                    csv_file,
+                    "text/csv; charset=utf-8",
+                    "top_200_clean.csv",
+                )
+                return
             if path == "/api/download-status":
                 job_id = query.get("job", [""])[0]
                 with JOBS_LOCK:
@@ -277,6 +305,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": f"Date JSON invalide: {error}"}, 400)
             return
         selected_tracks = payload.get("tracks")
+        organize_by_day = payload.get("organize_by_day", False)
+        if not isinstance(organize_by_day, bool):
+            self.send_json(
+                {"error": "Opțiunea de organizare pe zile este invalidă."},
+                400,
+            )
+            return
         if selected_tracks is not None:
             if (
                 not isinstance(selected_tracks, list)
@@ -305,7 +340,7 @@ class Handler(BaseHTTPRequestHandler):
         set_job(job_id, status="running", country=country)
         threading.Thread(
             target=run_week_download,
-            args=(job_id, country, selected_tracks),
+            args=(job_id, country, selected_tracks, organize_by_day),
             daemon=True,
         ).start()
         self.send_json({"job": job_id, "status": "running"}, 202)
