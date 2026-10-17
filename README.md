@@ -66,39 +66,6 @@ MUVO follows a simple workflow:
 
 This workflow was designed to make the music preparation process for Radio Blaj faster and easier, especially when preparing larger playlists.
 
-## Architecture
-
-The project is split into two main components:
-
-MUVO
-│
-├── assets/
-│   └── muvo-preview.png
-│
-├── frontend/
-│   ├── React
-│   ├── TypeScript
-│   └── Vite
-│
-├── server.py
-├── country_top_200.py
-├── descarca_saptamana.py
-├── requirements.txt
-└── README.md<img width="1600" height="747" alt="muvo" src="https://github.com/user-attachments/assets/3d8053b7-7da3-4ad6-a114-4420a0d796d6" />
-
-The React frontend communicates with the Python backend through REST API endpoints.
-
-The frontend is deployed separately from the backend:
-
-React / Vite
-     │
-     │ REST API
-     ▼
-Python Backend
-     │
-     ├── Spotify API
-     ├── Kworb
-     └── Audio processing
 
 ## Running Locally
 
